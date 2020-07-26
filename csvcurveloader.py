@@ -1,13 +1,14 @@
 import os
 import sys
-
-from PyQt5.Qt import QFileDialog, QApplication, QMessageBox
+from PyQt5 import Qt, QtGui, QtCore
+from PyQt5.Qt import QFileDialog, QApplication, QMessageBox, QMainWindow, QWindow
 
 
 class CSVCurveLoader(QFileDialog):
     """ This class loads only CSV files, and outputs them as either str or pandas.DataFrame"""
     def __init__(self, parent=None, window_title='Select a File', start_dir=os.getcwd(), *args):
         QFileDialog.__init__(self, parent, window_title, start_dir, *args)
+        self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
         if sys.platform == 'darwin':
             self.setOption(QFileDialog.DontUseNativeDialog)
         self.data = None
@@ -29,7 +30,6 @@ class CSVCurveLoader(QFileDialog):
 
     def get_data_string(self):
         return self.data
-
 
     def get_data_dataframe(self):
         import pandas as pd

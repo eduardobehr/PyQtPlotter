@@ -10,10 +10,12 @@ from PyQt5.Qt import QGraphicsLayout, QGraphicsWidget
 import numpy as np
 import pyqtgraph as pg
 from typing import Union
+from csvcurveloader import CSVCurveLoader
+import pandas as pd
 
 
 # presets:
-DEBUG = True
+DEBUG = False
 X_RANGE: tuple = (-10, +10)  # minimum and maximum value for the independent variable x (used as linspace argument)
 X_DATA_POINTS: int = 1001  # number of data points for the x linspace
 
@@ -43,7 +45,7 @@ class QTextBrowser2(QTextBrowser):
     def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
         if a0.key() == Qt.Key_Enter:
             print("AAAA")
-            window.plot_data()
+            window.plot_text_input_data()
 
 
 class MainWindow(QMainWindow):
@@ -83,10 +85,18 @@ class MainWindow(QMainWindow):
         self.input_string = ""  # same as input defined above, but replacing X by self.x
         self.pending_x_update = False  # stores the state of if any update on x linspace is needed
         self.toolbar: QToolBar = self.addToolBar('test')
-        self.toolbar.
-
+        self.load_button = QToolButton()
+        self.load_button.setText('Load CSV file')
+        self.toolbar.addWidget(self.load_button)
+        self.csv_data = None
+        self.x_csv = None
+        self.y_csv = None
+        self.curves = []  # keeps track of all the curves
         # -------------------------------------------------------------------------------------------------------------
         # Configure entities (in order of appearance)
+        self.load_button.setText('Load CSV file')
+        self.load_button.released.connect(self.load_curve)
+
         self.plot_widget.setMinimumSize(300, 300)
 
         self.v_layout.addWidget(self.plot_widget, alignment=Qt.Alignment())
@@ -137,7 +147,7 @@ class MainWindow(QMainWindow):
         self.spinbox_data_points.valueChanged.connect(self.raise_flag_update_x)
 
         self.plot_button.setFixedHeight(40)
-        self.plot_button.released.connect(self.plot_data)
+        self.plot_button.released.connect(self.plot_text_input_data)
 
         self.reset_button.setFixedHeight(40)
         self.reset_button.released.connect(self.reset_plot)
@@ -157,7 +167,8 @@ class MainWindow(QMainWindow):
         self.plot_canvas.setXRange(VIEWBOX['xmin'], VIEWBOX['xmax'], padding=0)
         self.plot_canvas.setYRange(VIEWBOX['ymin'], VIEWBOX['ymax'], padding=0)
         self.plot_canvas.showGrid(x=True, y=True, alpha=1)
-        self.plot_canvas.setDownsampling(mode='peak')  # 'peak', 'mean', 'subsample'
+        self.plot_canvas.setDownsampling(mode='mean', auto=True)  # 'peak', 'mean', 'subsample'
+        self.plot_canvas.setClipToView(True)
 
         self.x = linspace(
             self.spinbox_Xrange_min.value(),
@@ -183,8 +194,8 @@ class MainWindow(QMainWindow):
         """ Wrapper for printing text to the embedded console output"""
         self.output_text_browser.append(message)
 
-    def plot_data(self) -> None:
-        print(f'plotting init: from {self.x[0]} to {self.x[-1]}')
+    def plot_text_input_data(self) -> None:
+        # if DEBUG: print(f'plotting init: from {self.x[0]} to {self.x[-1]}')
 
         if self.spinbox_Xrange_min.value() > self.spinbox_Xrange_max.value():  # crossed range limits
             start = self.spinbox_Xrange_min.value()
@@ -194,7 +205,7 @@ class MainWindow(QMainWindow):
 
         if self.pending_x_update:
             self.update_x()
-        print(f'plotting actually: from {self.x[0]} to {self.x[-1]}')
+        # if DEBUG: print(f'plotting actually: from {self.x[0]} to {self.x[-1]}')
         try:
             self.y = eval(
                 self.input_string
@@ -235,12 +246,8 @@ class MainWindow(QMainWindow):
 
             # Finally, draw the function
             self.update_pen_color()
-            self.plot_canvas.plot(
-                x=self.x,
-                y=self.y,
-                pen=self.pen,
-                connect='finite'
-            )
+            self.plot_xy(self.x, self.y)
+
             if len(self.x) < X_DATA_POINTS:  # if x lost elements, resize it
                 self.x = linspace(self.spinbox_Xrange_min.value(), self.spinbox_Xrange_max.value(), X_DATA_POINTS)
             self.print_output(f"Plotting {self.input}")
@@ -250,6 +257,15 @@ class MainWindow(QMainWindow):
             self.print_output("NameError: use numpy syntax with uppercase X. Example: \n  sqrt(X)\n  exp(X)")
         except ZeroDivisionError:
             self.print_output("ZeroDivisionError")
+
+    def plot_xy(self, x_array, y_array):
+        # self.update_pen_color()
+        self.plot_canvas.plot(
+            x=x_array,
+            y=y_array,
+            pen=self.pen,
+            connect='finite'
+        )
 
     def update_pen_color(self):
         if self.color_counter >= len(COLORS):
@@ -271,6 +287,7 @@ class MainWindow(QMainWindow):
         self.raise_flag_update_x()
         self.plot_canvas.setXRange(VIEWBOX['xmin'], VIEWBOX['xmax'], padding=0)
         self.plot_canvas.setYRange(VIEWBOX['ymin'], VIEWBOX['ymax'], padding=0)
+        self.curves = []
 
     def on_input_change(self) -> None:
         self.input: str = self.function_input.toPlainText()
@@ -288,10 +305,30 @@ class MainWindow(QMainWindow):
                           ('⁹', '9')}:
             if nth_power[0] in self.input_string:
                 self.input_string = self.input_string.replace(nth_power[0], '**'+nth_power[1])
+
+    def load_curve(self):
+        if DEBUG: print('loading curve')
+        cv = CSVCurveLoader(None)
+        self.csv_data: pd.DataFrame = cv.get_data_dataframe()
+        # if DEBUG: print(f'loaded data: \n{self.csv_data}')
+        if self.csv_data is not None:
+            self.plot_csv()
+
+    def plot_csv(self):
+        self.csv_data: pd.DataFrame
+        self.x_csv = self.csv_data.iloc[:, 0]
+        self.print_output(f'Independent axis X from csv ranges from {self.x_csv.iloc[0]} to {self.x_csv.iloc[-1]}')
+        for y_column in range(1,len(self.csv_data.columns)):
+            self.print_output(f'    Plotting CSV curve {y_column}')
+            self.y_csv = self.csv_data.iloc[:, y_column]
+            self.update_pen_color()
+            self.plot_xy(self.x_csv, self.y_csv)
+
+            # TODO add legend!
     pass
 
-app = pg.Qt.QtGui.QApplication([])
-#app = QApplication([])
+# app = pg.Qt.QtGui.QApplication([])
+app = QApplication([])
 # app.setFont()
 i = 0
 
