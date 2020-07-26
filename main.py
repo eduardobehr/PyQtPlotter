@@ -9,6 +9,7 @@ from PyQt5.Qt import QGraphicsLayout, QGraphicsWidget
 # from pyqtgraph.graphicsItems import GraphicsLayout, GraphicsWidget
 import numpy as np
 import pyqtgraph as pg
+from pyqtgraph.graphicsItems import PlotDataItem
 from typing import Union
 from csvcurveloader import CSVCurveLoader
 import pandas as pd
@@ -259,13 +260,30 @@ class MainWindow(QMainWindow):
             self.print_output("ZeroDivisionError")
 
     def plot_xy(self, x_array, y_array):
-        # self.update_pen_color()
-        self.plot_canvas.plot(
+        """ This is the function that actually plots each call """
+        # # self.update_pen_color()
+        # self.plot_canvas.plot(
+        #     x=x_array,
+        #     y=y_array,
+        #     pen=self.pen,
+        #     connect='finite'
+        # )
+        # BUG: all curves update to the color of the last
+        # Fixme: maybe try to store the assigned color and call everything at each update call?
+
+        this_plot: PlotDataItem = self.plot_canvas.plot()
+        this_plot.setData(
             x=x_array,
             y=y_array,
             pen=self.pen,
             connect='finite'
         )
+        self.curves.append(this_plot)
+        this_plot.getData()
+        # self.plot_widget.addPlot(this_plot)
+    # canvas = self.plot_widget.addPlot()
+    # curve4 = win.addPlot().plot()
+    # curve4.setData(data3[:ptr3])
 
     def update_pen_color(self):
         if self.color_counter >= len(COLORS):
