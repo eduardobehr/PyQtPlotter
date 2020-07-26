@@ -82,8 +82,10 @@ class MainWindow(QMainWindow):
         self.input = ""  # function f(x) given by the user in order to plot
         self.input_string = ""  # same as input defined above, but replacing X by self.x
         self.pending_x_update = False  # stores the state of if any update on x linspace is needed
+        self.toolbar: QToolBar = self.addToolBar('test')
+        self.toolbar.
 
-        #
+        # -------------------------------------------------------------------------------------------------------------
         # Configure entities (in order of appearance)
         self.plot_widget.setMinimumSize(300, 300)
 
@@ -297,9 +299,8 @@ window = MainWindow()
 window.show()
 
 # TODO (not urgent):
-#   1)add option to load any real curves from pandas DF and/or csv files, and plot them
-#   ̣| X  |  y1  |  y2  |  y3  | ... |  yn
-#     0     -1      0     1     ...    0
+#   1) get DF from csvcurveloader.py
+#   2) plot them!
 
 if __name__ == '__main__':
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
