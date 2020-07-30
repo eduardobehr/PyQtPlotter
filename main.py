@@ -5,18 +5,20 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 from PyQt5 import QtGui, QtCore
 from numpy import *
-from PyQt5.Qt import QGraphicsLayout, QGraphicsWidget
-# from pyqtgraph.graphicsItems import GraphicsLayout, GraphicsWidget
-import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.graphicsItems import PlotDataItem
-from typing import Union
 from csvcurveloader import CSVCurveLoader
 import pandas as pd
+# from PyQt5.Qt import QGraphicsLayout, QGraphicsWidget
+# from pyqtgraph.graphicsItems import GraphicsLayout, GraphicsWidget
+# import numpy as np
+# from pyqtgraph.graphicsItems import PlotDataItem, PlotCurveItem
+# from typing import Union
+
 
 
 # presets:
 DEBUG = False
+DOWNSAMPLING = False  # improves performance, but as of 26/07/20 has a bug.
 X_RANGE: tuple = (-10, +10)  # minimum and maximum value for the independent variable x (used as linspace argument)
 X_DATA_POINTS: int = 1001  # number of data points for the x linspace
 
@@ -137,12 +139,6 @@ class MainWindow(QMainWindow):
         self.spinbox_Xrange_max.setValue(X_RANGE[1])  # setting initial value
         self.spinbox_data_points.setValue(X_DATA_POINTS)  # setting initial value
 
-
-
-
-        # self.spinbox_Xrange_min.valueChanged.connect(
-        #     lambda: self.spinbox_Xrange_max.setMinimum(self.spinbox_Xrange_min.value())
-        # )
         self.spinbox_Xrange_min.valueChanged.connect(self.raise_flag_update_x)
         self.spinbox_Xrange_max.valueChanged.connect(self.raise_flag_update_x)
         self.spinbox_data_points.valueChanged.connect(self.raise_flag_update_x)
@@ -168,8 +164,10 @@ class MainWindow(QMainWindow):
         self.plot_canvas.setXRange(VIEWBOX['xmin'], VIEWBOX['xmax'], padding=0)
         self.plot_canvas.setYRange(VIEWBOX['ymin'], VIEWBOX['ymax'], padding=0)
         self.plot_canvas.showGrid(x=True, y=True, alpha=1)
-        self.plot_canvas.setDownsampling(mode='mean', auto=True)  # 'peak', 'mean', 'subsample'
-        self.plot_canvas.setClipToView(True)
+
+        if DOWNSAMPLING:
+            self.plot_canvas.setDownsampling(mode='subsample', auto=True)  # 'peak', 'mean', 'subsample'
+            self.plot_canvas.setClipToView(True)
 
         self.x = linspace(
             self.spinbox_Xrange_min.value(),
@@ -259,6 +257,7 @@ class MainWindow(QMainWindow):
         except ZeroDivisionError:
             self.print_output("ZeroDivisionError")
 
+
     def plot_xy(self, x_array, y_array):
         """ This is the function that actually plots each call """
         # # self.update_pen_color()
@@ -271,19 +270,35 @@ class MainWindow(QMainWindow):
         # BUG: all curves update to the color of the last
         # Fixme: maybe try to store the assigned color and call everything at each update call?
 
-        this_plot: PlotDataItem = self.plot_canvas.plot()
-        this_plot.setData(
-            x=x_array,
-            y=y_array,
-            pen=self.pen,
-            connect='finite'
-        )
-        self.curves.append(this_plot)
-        this_plot.getData()
+        # this_plot: PlotDataItem = self.plot_canvas.plot()
+        # this_plot.setData(
+        #     x=x_array,
+        #     y=y_array,
+        #     pen=self.pen,
+        #     connect='finite'
+        # )
+
+        #1
+        this_plot = self.plot_canvas.plot(x_array, y_array, pen=self.pen, connect='finite')
+        self.plot_canvas.addLegend()
+        #2
+        # this_plot = PlotDataItem.PlotDataItem(x_array, y_array, pen=self.pen, connect='finite', name=np.random.normal())
+        # self.plot_canvas.addItem(this_plot)
+        # legend = pg.LegendItem()
+        # legend.setParentItem(p=this_plot)
+        # self.curves.append(this_plot)
+        # this_plot.getData()
+
+        #3
+        # self.plot_widget.addPlot(x_array, y_array, pen=self.pen, connect='finite')
+
+
+
+
         # self.plot_widget.addPlot(this_plot)
-    # canvas = self.plot_widget.addPlot()
-    # curve4 = win.addPlot().plot()
-    # curve4.setData(data3[:ptr3])
+        # canvas = self.plot_widget.addPlot()
+        # curve4 = win.addPlot().plot()
+        # curve4.setData(data3[:ptr3])
 
     def update_pen_color(self):
         if self.color_counter >= len(COLORS):
@@ -345,19 +360,11 @@ class MainWindow(QMainWindow):
             # TODO add legend!
     pass
 
-# app = pg.Qt.QtGui.QApplication([])
-app = QApplication([])
-# app.setFont()
-i = 0
-
-window = MainWindow()
-window.show()
-
-# TODO (not urgent):
-#   1) get DF from csvcurveloader.py
-#   2) plot them!
 
 if __name__ == '__main__':
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         if DEBUG: print('Starting app')
         app.instance().exec_()
